@@ -1,6 +1,8 @@
-import { Clock, BarChart3, CheckCircle2, PlayCircle, Award } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, CheckCircle2, PlayCircle, Award, BookOpen } from 'lucide-react';
 import { Course } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { CourseCurriculum } from './CourseCurriculum';
 
 type CourseCardProps = {
   course: Course;
@@ -9,6 +11,7 @@ type CourseCardProps = {
 
 export function CourseCard({ course, featured = false }: CourseCardProps) {
   const { user } = useAuth();
+  const [showCurriculum, setShowCurriculum] = useState(false);
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
@@ -117,11 +120,26 @@ export function CourseCard({ course, featured = false }: CourseCardProps) {
           <button className="flex-1 py-3 px-4 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-lg hover:shadow-xl">
             {user ? 'Enroll Now' : 'Sign In to Enroll'}
           </button>
-          <button className="p-3 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-600 dark:hover:border-blue-400 rounded-xl transition-all">
-            <PlayCircle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          <button
+            onClick={() => setShowCurriculum(true)}
+            className="p-3 border-2 border-gray-200 dark:border-gray-700 hover:border-blue-600 dark:hover:border-blue-400 rounded-xl transition-all"
+            title="View Full Curriculum"
+          >
+            <BookOpen className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           </button>
         </div>
       </div>
+
+      {showCurriculum && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setShowCurriculum(false)}
+        >
+          <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CourseCurriculum />
+          </div>
+        </div>
+      )}
 
       {featured && (
         <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-3xl opacity-0 group-hover:opacity-20 blur-xl transition-opacity -z-10"></div>

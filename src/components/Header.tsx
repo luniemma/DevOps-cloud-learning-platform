@@ -14,10 +14,11 @@ export function Header() {
 
   const navigation = [
     { name: 'Home', href: '#home' },
+    { name: 'Learning Paths', href: '#learning-paths' },
     { name: 'Courses', href: '#courses' },
+    { name: 'Resources', href: '#resources' },
     { name: 'Blog', href: '#blog' },
     { name: 'Videos', href: '#videos' },
-    { name: 'Gallery', href: '#gallery' },
     { name: 'About', href: '#about' },
     { name: 'Contact', href: '#contact' },
   ];
