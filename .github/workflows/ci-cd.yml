@@ -34,6 +34,9 @@ jobs:
       - name: Run type check
         run: npm run typecheck
 
+      - name: Run tests
+        run: npm test
+
       - name: Build application
         run: npm run build
 
@@ -45,6 +48,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+      image-digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,6 +76,7 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -95,17 +102,37 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: 'v1.29.0'
 
       - name: Configure kubeconfig
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Deploy to Kubernetes
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
         run: |
-          kubectl apply -k k8s/
-          kubectl rollout status deployment/devops-learning-app -n devops-learning
+          # Apply Kustomize manifests for staging
+          kubectl apply -k k8s/overlays/staging
+          
+          # Update the image to the newly built version
+          kubectl set image deployment/devops-learning-app \
+            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image-digest }} \
+            -n devops-learning
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/devops-learning-app -n devops-learning --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n devops-learning
+          kubectl get services -n devops-learning
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: rm -f $HOME/.kube/config
 
   deploy-production:
     name: Deploy to Production
@@ -122,19 +149,34 @@ jobs:
       - name: Setup kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: 'v1.29.0'
 
       - name: Configure kubeconfig
         run: |
           mkdir -p $HOME/.kube
           echo "${{ secrets.KUBE_CONFIG_PROD }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Deploy to Kubernetes
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
         run: |
-          kubectl apply -k k8s/
-          kubectl rollout status deployment/devops-learning-app -n devops-learning
+          # Apply Kustomize manifests for production
+          kubectl apply -k k8s/overlays/production
+          
+          # Update the image to the newly built version (using digest for immutability)
+          kubectl set image deployment/devops-learning-app \
+            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build-and-push.outputs.image-digest }} \
+            -n devops-learning
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/devops-learning-app -n devops-learning --timeout=300s
 
       - name: Verify deployment
         run: |
           kubectl get pods -n devops-learning
           kubectl get services -n devops-learning
+
+      - name: Cleanup kubeconfig
+        if: always()
+        run: rm -f $HOME/.kube/config
