@@ -1,5 +1,5 @@
 # =============================================================================
-# REUSABLE BUILD AND DEPLOY WORKFLOW
+# REUSABLE BUILD AND DEPLOY WORKFLOW (Docker Hub Version)
 # Place this in: DevOps-cloud-learning-platform/.github/workflows/build-deploy-reusable.yml
 # =============================================================================
 name: Reusable Build and Deploy
@@ -31,6 +31,11 @@ on:
         required: false
         type: string
         default: 'devops-learning'
+      use_dockerhub:
+        description: 'Use Docker Hub instead of GHCR'
+        required: false
+        type: boolean
+        default: true
     secrets:
       AZURE_CLIENT_ID:
         required: true
@@ -44,6 +49,10 @@ on:
         required: true
       AKS_RESOURCE_GROUP:
         required: true
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
     outputs:
       image_tag:
         description: 'Deployed image tag'
@@ -54,10 +63,6 @@ on:
       deployment_url:
         description: 'Deployment URL'
         value: ${{ jobs.deploy.outputs.deployment_url }}
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # ===========================================================================
@@ -111,18 +116,40 @@ jobs:
     outputs:
       image_tag: ${{ steps.meta.outputs.version }}
       image_digest: ${{ steps.build.outputs.digest }}
+      full_image: ${{ steps.registry.outputs.image }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Determine Registry
+        id: registry
+        run: |
+          if [ "${{ inputs.use_dockerhub }}" == "true" ]; then
+            echo "registry=docker.io" >> $GITHUB_OUTPUT
+            echo "image=${{ secrets.DOCKERHUB_USERNAME }}/devops-learning-platform" >> $GITHUB_OUTPUT
+            echo "Using Docker Hub"
+          else
+            echo "registry=ghcr.io" >> $GITHUB_OUTPUT
+            echo "image=ghcr.io/${{ github.repository }}" >> $GITHUB_OUTPUT
+            echo "Using GitHub Container Registry"
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Container Registry
+      - name: Log in to Docker Hub
+        if: inputs.use_dockerhub == true
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        if: inputs.use_dockerhub == false
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -130,7 +157,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ steps.registry.outputs.image }}
           tags: |
             type=raw,value=${{ inputs.image_tag }},enable=${{ inputs.image_tag != '' }}
             type=sha,prefix=${{ inputs.environment }}-
@@ -155,7 +182,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | \`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Registry | ${{ steps.registry.outputs.registry }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | \`${{ steps.registry.outputs.image }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Tag | \`${{ steps.meta.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Digest | \`${{ steps.build.outputs.digest }}\` |" >> $GITHUB_STEP_SUMMARY
 
@@ -212,6 +240,16 @@ jobs:
         run: |
           kubectl create namespace ${{ inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
+      - name: Create Docker Registry Secret
+        if: inputs.use_dockerhub == true
+        run: |
+          kubectl create secret docker-registry dockerhub-secret \
+            --docker-server=docker.io \
+            --docker-username=${{ secrets.DOCKERHUB_USERNAME }} \
+            --docker-password=${{ secrets.DOCKERHUB_TOKEN }} \
+            --namespace=${{ inputs.namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy with Kustomize
         if: inputs.deploy_method == 'kustomize'
         run: |
@@ -233,8 +271,15 @@ jobs:
           
           # Update image
           kubectl set image deployment/devops-learning-app \
-            app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image_digest }} \
+            app=${{ needs.build.outputs.full_image }}@${{ needs.build.outputs.image_digest }} \
             -n ${{ inputs.namespace }}
+          
+          # Add image pull secret if using Docker Hub
+          if [ "${{ inputs.use_dockerhub }}" == "true" ]; then
+            kubectl patch deployment devops-learning-app \
+              -n ${{ inputs.namespace }} \
+              -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"dockerhub-secret"}]}}}}'
+          fi
           
           # Wait for rollout
           kubectl rollout status deployment/devops-learning-app \
@@ -261,13 +306,20 @@ jobs:
             VALUES_ARG="-f helm/devops-learning/values-${VALUES_ENV}.yaml"
           fi
           
+          # Set image pull secret for Docker Hub
+          PULL_SECRET_ARG=""
+          if [ "${{ inputs.use_dockerhub }}" == "true" ]; then
+            PULL_SECRET_ARG="--set imagePullSecrets[0].name=dockerhub-secret"
+          fi
+          
           helm upgrade --install devops-learning ./helm/devops-learning \
             --namespace ${{ inputs.namespace }} \
             --create-namespace \
             $VALUES_ARG \
-            --set image.repository=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} \
+            --set image.repository=${{ needs.build.outputs.full_image }} \
             --set image.tag=${{ needs.build.outputs.image_tag }} \
             --set environment=${{ inputs.environment }} \
+            $PULL_SECRET_ARG \
             --wait \
             --timeout 5m
 

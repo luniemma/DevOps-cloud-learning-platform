@@ -1,5 +1,5 @@
 # =============================================================================
-# MAIN CI/CD WORKFLOW
+# MAIN CI/CD WORKFLOW (Docker Hub Version)
 # Place this in: DevOps-cloud-learning-platform/.github/workflows/ci-cd.yml
 # =============================================================================
 name: CI/CD Pipeline
@@ -36,7 +36,7 @@ on:
         type: boolean
         default: false
   
-  # Triggered from AKS infrastructure repo after cluster deployment
+  # Triggered from AKS infrastructure repo
   repository_dispatch:
     types: [deploy-app, aks-ready]
 
@@ -45,13 +45,9 @@ permissions:
   packages: write
   id-token: write
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   # ===========================================================================
-  # SETUP - Determine what to do
+  # SETUP
   # ===========================================================================
   setup:
     name: Setup
@@ -65,18 +61,16 @@ jobs:
       - name: Determine Configuration
         id: config
         run: |
-          # Default values
           DEPLOY="false"
           SKIP_TESTS="false"
           DEPLOY_METHOD="kustomize"
           
-          # Repository dispatch (triggered from AKS repo)
+          # Repository dispatch (from AKS repo)
           if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
             ENV="${{ github.event.client_payload.environment || 'staging' }}"
             DEPLOY="true"
             SKIP_TESTS="${{ github.event.client_payload.skip_tests || 'false' }}"
             DEPLOY_METHOD="${{ github.event.client_payload.deploy_method || 'kustomize' }}"
-            echo "📡 Triggered by repository dispatch (AKS repo)"
           
           # Manual dispatch
           elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -84,25 +78,21 @@ jobs:
             DEPLOY="true"
             SKIP_TESTS="${{ inputs.skip_tests }}"
             DEPLOY_METHOD="${{ inputs.deploy_method }}"
-            echo "🔧 Manual workflow dispatch"
           
           # Push to main = production
           elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
             ENV="production"
             DEPLOY="true"
-            echo "🚀 Push to main -> Production deployment"
           
           # Push to develop = staging
           elif [ "${{ github.ref }}" == "refs/heads/develop" ]; then
             ENV="staging"
             DEPLOY="true"
-            echo "🔄 Push to develop -> Staging deployment"
           
           # Pull request = tests only
           else
             ENV="staging"
             DEPLOY="false"
-            echo "🔍 Pull request -> Tests only"
           fi
           
           echo "environment=$ENV" >> $GITHUB_OUTPUT
@@ -117,12 +107,10 @@ jobs:
           echo "| Environment | $ENV |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy | $DEPLOY |" >> $GITHUB_STEP_SUMMARY
           echo "| Deploy Method | $DEPLOY_METHOD |" >> $GITHUB_STEP_SUMMARY
-          echo "| Skip Tests | $SKIP_TESTS |" >> $GITHUB_STEP_SUMMARY
           echo "| Trigger | ${{ github.event_name }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
-  # PR CHECKS (No deployment)
+  # PR CHECKS
   # ===========================================================================
   pr-checks:
     name: PR Checks
@@ -157,10 +145,9 @@ jobs:
       - name: PR Summary
         run: |
           echo "### ✅ PR Checks Passed" >> $GITHUB_STEP_SUMMARY
-          echo "Ready to merge!" >> $GITHUB_STEP_SUMMARY
 
   # ===========================================================================
-  # BUILD AND DEPLOY (Using reusable workflow)
+  # BUILD AND DEPLOY
   # ===========================================================================
   deploy:
     name: Build and Deploy
@@ -172,6 +159,7 @@ jobs:
       deploy_method: ${{ needs.setup.outputs.deploy_method }}
       skip_tests: ${{ needs.setup.outputs.skip_tests == 'true' }}
       namespace: devops-learning
+      use_dockerhub: true
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -179,9 +167,11 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AKS_CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
       AKS_RESOURCE_GROUP: ${{ secrets.AKS_RESOURCE_GROUP }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   # ===========================================================================
-  # FINAL SUMMARY
+  # SUMMARY
   # ===========================================================================
   summary:
     name: Summary
@@ -199,9 +189,6 @@ jobs:
             echo "| Environment | ${{ needs.setup.outputs.environment }} |" >> $GITHUB_STEP_SUMMARY
             echo "| Image Tag | ${{ needs.deploy.outputs.image_tag }} |" >> $GITHUB_STEP_SUMMARY
             echo "| URL | ${{ needs.deploy.outputs.deployment_url }} |" >> $GITHUB_STEP_SUMMARY
-            echo "| Deployed by | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           else
             echo "### ❌ Deployment Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the logs for details." >> $GITHUB_STEP_SUMMARY
           fi
