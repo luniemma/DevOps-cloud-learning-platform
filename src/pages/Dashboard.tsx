@@ -13,6 +13,27 @@ export function Dashboard() {
     bio: profile?.bio || '',
   });
 
+  const loadDashboardData = async () => {
+    try {
+      const { data: enrollmentsData } = await supabase
+        .from('course_enrollments')
+        .select(`
+          *,
+          course:courses(*)
+        `)
+        .eq('user_id', user!.id)
+        .order('enrolled_at', { ascending: false });
+
+      if (enrollmentsData) {
+        setEnrollments(enrollmentsData as (CourseEnrollment & { course: Course | null })[]);
+      }
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       loadDashboardData();
@@ -27,27 +48,6 @@ export function Dashboard() {
       });
     }
   }, [profile]);
-
-  const loadDashboardData = async () => {
-    try {
-      const { data: enrollmentsData } = await supabase
-        .from('course_enrollments')
-        .select(`
-          *,
-          course:courses(*)
-        `)
-        .eq('user_id', user!.id)
-        .order('enrolled_at', { ascending: false });
-
-      if (enrollmentsData) {
-        setEnrollments(enrollmentsData as any);
-      }
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveProfile = async () => {
     const { error } = await updateProfile(formData);

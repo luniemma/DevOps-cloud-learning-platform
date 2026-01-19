@@ -33,8 +33,8 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         if (error) throw error;
       }
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }

@@ -90,7 +90,7 @@ export function LearningPaths() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
-          {paths.map((path, index) => {
+          {paths.map((path) => {
             const DifficultyIcon = getDifficultyIcon(path.difficulty);
             return (
               <div
