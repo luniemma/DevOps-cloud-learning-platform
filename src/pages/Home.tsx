@@ -1,26 +1,9 @@
-import { ArrowRight, Cloud, Code, GitBranch, Server, Award, Users, BookOpen, Star, CheckCircle, Zap, Shield, TrendingUp, PlayCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ArrowRight, Cloud, Code, GitBranch, Server, Award, Users, BookOpen, Star, Zap, Shield, TrendingUp, PlayCircle } from 'lucide-react';
+import { useState } from 'react';
 import { AuthModal } from '../components/AuthModal';
-import { supabase, Course } from '../lib/supabase';
 
 export function Home() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [featuredCourses, setFeaturedCourses] = useState<Course[]>([]);
-
-  useEffect(() => {
-    loadFeaturedCourses();
-  }, []);
-
-  const loadFeaturedCourses = async () => {
-    const { data } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('is_published', true)
-      .order('order_index')
-      .limit(3);
-
-    if (data) setFeaturedCourses(data);
-  };
 
   const features = [
     {
