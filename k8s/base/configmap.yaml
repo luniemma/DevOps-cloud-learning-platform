@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-learning-config
+  namespace: devops-learning
+data:
+  app.config: |
+    {
+      "environment": "production",
+      "logLevel": "info",
+      "features": {
+        "analytics": true,
+        "caching": true
+      }
+    }
