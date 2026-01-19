@@ -22,7 +22,9 @@ type CourseCurriculumProps = {
 };
 
 export function CourseCurriculum({ modules }: CourseCurriculumProps) {
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set([modules?.[0]?.id]));
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(
+    new Set(modules?.[0]?.id ? [modules[0].id] : [])
+  );
 
   const sampleModules: Module[] = modules || [
     {
