@@ -6,7 +6,7 @@ echo "======================================"
 echo "DevOps Learning Platform Rollback"
 echo "======================================"
 
-NAMESPACE="devops-learning"
+NAMESPACE="dev"
 DEPLOYMENT="devops-learning-app"
 
 echo "Checking rollout history..."

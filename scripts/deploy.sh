@@ -7,7 +7,7 @@ echo "DevOps Learning Platform Deployment"
 echo "======================================"
 
 ENVIRONMENT=${1:-production}
-NAMESPACE="devops-learning"
+NAMESPACE="dev"
 
 echo "Environment: $ENVIRONMENT"
 echo "Namespace: $NAMESPACE"

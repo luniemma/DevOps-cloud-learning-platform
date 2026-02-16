@@ -158,7 +158,7 @@ jobs:
       environment: ${{ needs.setup.outputs.environment }}
       deploy_method: ${{ needs.setup.outputs.deploy_method }}
       skip_tests: ${{ needs.setup.outputs.skip_tests == 'true' }}
-      namespace: devops-learning
+      namespace: dev
       use_dockerhub: true
     secrets:
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}

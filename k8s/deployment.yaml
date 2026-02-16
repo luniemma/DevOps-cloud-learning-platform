@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: devops-learning-app
-  namespace: devops-learning
+  namespace: dev
   labels:
     app: devops-learning
     version: v1

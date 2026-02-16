@@ -30,7 +30,7 @@ on:
         description: 'Kubernetes namespace'
         required: false
         type: string
-        default: 'devops-learning'
+        default: 'dev'
       use_dockerhub:
         description: 'Use Docker Hub instead of GHCR'
         required: false
@@ -236,10 +236,6 @@ jobs:
           
           kubelogin convert-kubeconfig -l azurecli
 
-      - name: Create namespace
-        run: |
-          kubectl create namespace ${{ inputs.namespace }} --dry-run=client -o yaml | kubectl apply -f -
-
       - name: Create Docker Registry Secret
         if: inputs.use_dockerhub == true
         run: |
@@ -314,7 +310,6 @@ jobs:
           
           helm upgrade --install devops-learning ./helm/devops-learning \
             --namespace ${{ inputs.namespace }} \
-            --create-namespace \
             $VALUES_ARG \
             --set image.repository=${{ needs.build.outputs.full_image }} \
             --set image.tag=${{ needs.build.outputs.image_tag }} \

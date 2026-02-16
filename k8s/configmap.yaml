@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: devops-learning-config
-  namespace: devops-learning
+  namespace: dev
 data:
   app.config: |
     {

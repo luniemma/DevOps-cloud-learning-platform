@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: devops-learning
+  name: dev
   labels:
-    name: devops-learning
+    name: dev
     environment: production
